@@ -4,7 +4,19 @@
 	import Button from './Button.svelte';
 	import { getJson, postJson, HttpError } from '$lib/api/http';
 
-	let { id, onclose }: { id: number | string; onclose: () => void } = $props();
+	let {
+		id,
+		onclose,
+		auto = false,
+		expectedUid
+	}: {
+		id: number | string;
+		onclose: () => void;
+		/** The tag is already on the reader (blank-tag prompt): prepare the preview without a second click. */
+		auto?: boolean;
+		/** UID offered by the blank-tag prompt: a different tag on the reader blocks the write. */
+		expectedUid?: string;
+	} = $props();
 	type Field = {
 		name: string;
 		type: string;
@@ -49,6 +61,7 @@
 	let deadline = $state(0);
 	let seconds = $state(0);
 	let dialog: HTMLDialogElement;
+	const wrongTag = $derived(!!(preview && expectedUid && preview.uid !== expectedUid));
 	let resetConfirmed = $state(false);
 
 	function message(e: unknown) {
@@ -74,6 +87,7 @@
 					for (const [name, value] of Object.entries(data)) {
 						values[`${region}.${name}`] = Array.isArray(value) ? JSON.stringify(value) : String(value);
 					}
+				if (auto && schema.enabled && reservation) await inspect();
 			})
 			.catch((e) => {
 				if (active) error = message(e);
@@ -256,6 +270,10 @@
 			Memoria: dati principali {preview.preview.main_bytes}/{preview.preview.main_capacity} byte; utilizzo {preview
 				.preview.aux_bytes}/{preview.preview.aux_capacity} byte.
 		</p>
+		{#if wrongTag}<p class="error" role="alert">
+				Sul lettore c’è un tag diverso da quello proposto ({expectedUid}). Chiudi, rimetti il tag giusto e
+				riprova.
+			</p>{/if}
 		{#if !preview.blank && !consumed}<label class="replace"
 				><input type="checkbox" bind:checked={replace} />Autorizzo la sostituzione di tutti i dati del tag,
 				anche quelli non presenti nel form. Il demone salva prima un backup.</label
@@ -282,7 +300,8 @@
 			>
 		{:else if !consumed}<Button
 				onclick={write}
-				disabled={busy || seconds <= 0 || (!preview.blank && !replace)}>Conferma e scrivi tag</Button
+				disabled={busy || wrongTag || seconds <= 0 || (!preview.blank && !replace)}
+				>Conferma e scrivi tag</Button
 			>{/if}
 	</footer>
 </dialog>

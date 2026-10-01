@@ -131,3 +131,28 @@ queue; no second serial descriptor is opened by HTTP requests.
   the real HTTP bridge and an emulated serial firmware. Physical UI-to-Phoenix
   validation passed on 1 Oct 2026: write from the Spoolman UI, firmware verification,
   association to the spool and re-scan without a duplicate.
+
+## Blank tag on the reader (offer to write)
+
+Needs the `claude/blank-tag-flow` changes of Phoenix-OpenTag (firmware, daemon and bridge:
+`PHOENIX-BLANK`, `/blank`, `write-resume`) and a configured writer (`SPOOLMAN_WRITER_URL` and
+token).
+
+When an empty ICODE SLIX2 tag is placed on the reader and the printer is idle, the daemon sends
+Spoolman a scan with `format: "openprinttag-blank"` through the existing `/api/v1/tag/scan`
+relay. Any open browser then shows **Tag vuoto rilevato**:
+
+1. The spools without a tag are listed. If there is exactly one it is preselected; with several the
+   user picks the spool the tag was stuck on; with none the dialog explains that the spool must be
+   created first. A UID already linked to a spool (a wiped tag) offers only that spool.
+2. **Scrivi su questa bobina** opens the normal write dialog with the reader already reserved and the
+   preview prepared (no second tag placement). Nothing is written until **Conferma e scrivi tag**.
+3. If the tag on the reader is not the one the prompt offered, confirmation is disabled.
+4. After a verified write and association, closing the dialog makes the reader read the tag again
+   (`write-resume`): the normal lookup runs and Moonraker activates the spool, with no need to
+   remove the tag.
+
+The daemon ignores the blank tag (no prompt) while Moonraker reports `printing`/`paused`,
+`idle_timeout` `Printing` (G-code running: macros, heating, filament load/unload), a write session
+is open, or Moonraker is unreachable. Only blank tags are offered: an occupied tag is never replaced
+automatically.
