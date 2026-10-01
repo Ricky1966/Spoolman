@@ -39,7 +39,8 @@ checking the verified tag. Do not re-scan it into automatic spool creation first
 
 ## Dependencies and deployment for the first hardware test
 
-Firmware 0.6.0-dev from Phoenix-OpenTag PR #3 has already been tested on ESP32 +
+Firmware from Phoenix-OpenTag PR #3 (including the fix that limits writing to SLIX2
+user blocks 0-78, since block 79 is a read-only counter) has been tested on ESP32 +
 PN5180 for writing, verification and interrupted-write recovery. This UI requires
 also the **new host bridge**, branch `codex/spoolman-write-bridge` in
 `Ricky1966/phoenix-opentag`. Copy all three host files together:
@@ -50,8 +51,8 @@ also the **new host bridge**, branch `codex/spoolman-write-bridge` in
 
 The existing `--serial` by-id argument remains necessary. Do not run the manual
 writer/serial monitor while the daemon owns the port. USB is used for writing even
-when normal tag delivery is configured as WiFi. No new firmware flash is needed
-if the tested 0.6.0-dev writer is already installed.
+when normal tag delivery is configured as WiFi. The ESP32 must run firmware that includes the 316-byte (blocks 0-78) fix;
+older writer firmware fails at block 79.
 
 Generate a long random credential locally (never commit it). Set the same value as:
 
@@ -128,4 +129,5 @@ queue; no second serial descriptor is opened by HTTP requests.
 - Generated images are accepted by the existing firmware parser in a native test.
 - Svelte type-check, lint and production build; browser end-to-end test with SQLite,
   the real HTTP bridge and an emulated serial firmware. Physical UI-to-Phoenix
-  validation is still required; only the firmware primitive was tested on hardware.
+  validation passed on 1 Oct 2026: write from the Spoolman UI, firmware verification,
+  association to the spool and re-scan without a duplicate.
