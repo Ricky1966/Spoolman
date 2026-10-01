@@ -12,7 +12,7 @@ services:
       timeout: 5s
       retries: 30
   spoolman:
-    image: donkie/spoolman:test
+    image: ${GHCR_IMAGE:-donkie/spoolman}:test
     environment:
       - SPOOLMAN_DB_TYPE=postgres
       - SPOOLMAN_DB_HOST=db
@@ -29,7 +29,7 @@ services:
       db:
         condition: service_healthy
   tester:
-    image: donkie/spoolman-tester:latest
+    image: ${GHCR_IMAGE:-donkie/spoolman}-tester:latest
     volumes:
       - ./tests:/tester/tests
     environment:

@@ -28,7 +28,7 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/master' && !startsWith(github.ref, 'refs/tags/') }}
 
 env:
-  GHCR_IMAGE: donkie/spoolman
+  GHCR_IMAGE: ricky1966/spoolman
 
 jobs:
   #
@@ -638,7 +638,8 @@ jobs:
   # Don't run this for pull requests
   #
   publish-images:
-    if: ${{ github.event_name != 'pull_request' }}
+    # Publish stable images only from the fork default branch or release tags.
+    if: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v')) }}
     needs:
       [
         test,
@@ -685,10 +686,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # The trailing type=ref,event=branch is what gives an unmerged branch a
-      # pullable image (ghcr.io/donkie/spoolman:my-branch) for a bug reporter to
-      # test. It is GHCR-only and skips master (already published as :edge), so
-      # Docker Hub keeps carrying nothing but :edge and tagged releases.
+      # This fork publishes only its default branch and release tags.
       - name: Extract metadata (tags, labels) for GHCR
         id: meta-ghcr
         uses: docker/metadata-action@v5.5.1
@@ -700,9 +698,9 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
-            type=ref,event=branch,enable=${{ github.ref_name != 'master' }}
 
       - name: Extract metadata (tags, labels) for Docker Hub
+        if: ${{ vars.REMOTE_REGISTRY_REPOSITORY != '' }}
         id: meta-dh
         uses: docker/metadata-action@v5.5.1
         with:
@@ -715,6 +713,7 @@ jobs:
             type=semver,pattern={{major}}
 
       - name: Log in to DockerHub
+        if: ${{ vars.REMOTE_REGISTRY_REPOSITORY != '' }}
         uses: docker/login-action@v3.3.0
         with:
           registry: ${{ vars.REMOTE_REGISTRY_URL }}
