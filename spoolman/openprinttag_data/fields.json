@@ -1,0 +1,1318 @@
+{
+  "main": [
+    {
+      "key": 0,
+      "name": "instance_uuid",
+      "type": "uuid",
+      "description": [
+        "Unique identifier of the package instance.",
+        "If not specified, can be deduced from `brand_uuid` + NFC tag UID.",
+        "See _UUID_ section for more details."
+      ]
+    },
+    {
+      "key": 1,
+      "name": "package_uuid",
+      "type": "uuid",
+      "description": [
+        "Universally unique identifier of the package (product)",
+        "If not specified, can be deduced from `brand_uuid` + `gtin`.",
+        "See _UUID_ section for more details."
+      ]
+    },
+    {
+      "key": 2,
+      "name": "material_uuid",
+      "type": "uuid",
+      "description": [
+        "Universally unique identifier of the material.",
+        "If not specified, can be deduced from `brand_uuid` + `material_name`.",
+        "See _UUID_ section for more details."
+      ]
+    },
+    {
+      "key": 3,
+      "name": "brand_uuid",
+      "type": "uuid",
+      "description": [
+        "Universally unique identifier of the brand",
+        "If not specified, can be deduced from the `brand_name` string.",
+        "See _UUID_ section for more details."
+      ]
+    },
+    {
+      "key": 4,
+      "name": "gtin",
+      "type": "number",
+      "required": "recommended",
+      "description": "Global Trade Item Number."
+    },
+    {
+      "key": 5,
+      "name": "brand_specific_instance_id",
+      "type": "string",
+      "max_length": 16,
+      "description": [
+        "Brand-specific identifier of the package instance.",
+        "Not much use cases at this moment, possibly just for URL deduction"
+      ]
+    },
+    {
+      "key": 6,
+      "name": "brand_specific_package_id",
+      "type": "string",
+      "max_length": 16,
+      "description": [
+        "Brand-specific identifier of the package (product ID).",
+        "Not much use cases at this moment, possibly just for URL deduction"
+      ]
+    },
+    {
+      "key": 7,
+      "name": "brand_specific_material_id",
+      "type": "string",
+      "max_length": 16,
+      "description": [
+        "Together with brand uniquely identifies each material.",
+        "Not much use cases at this moment, possibly just for URL deduction."
+      ]
+    },
+    {
+      "key": 8,
+      "name": "material_class",
+      "type": "enum",
+      "required": true,
+      "example": "FFF",
+      "items_file": "material_class_enum.yaml",
+      "display_name_field": "description",
+      "options": [
+        {
+          "value": "FFF",
+          "key": 0,
+          "label": "Filament"
+        },
+        {
+          "value": "SLA",
+          "key": 1,
+          "label": "Resin"
+        }
+      ]
+    },
+    {
+      "key": 9,
+      "name": "material_type",
+      "type": "enum",
+      "category": "fff",
+      "items_file": "material_type_enum.yaml",
+      "name_field": "abbreviation",
+      "display_name_field": "name",
+      "required": "recommended",
+      "example": "PC",
+      "description": [
+        "Coarse classification of the material.",
+        "Useful for determining default parameters for preheat an such that are not explicitly specified in the data.",
+        "If the material does not match any of the proposed material types, can be left unspecified."
+      ],
+      "options": [
+        {
+          "value": "PLA",
+          "key": 0,
+          "label": "Polylactic Acid"
+        },
+        {
+          "value": "PETG",
+          "key": 1,
+          "label": "Polyethylene Terephthalate Glycol"
+        },
+        {
+          "value": "TPU",
+          "key": 2,
+          "label": "Thermoplastic Polyurethane"
+        },
+        {
+          "value": "ABS",
+          "key": 3,
+          "label": "Acrylonitrile Butadiene Styrene"
+        },
+        {
+          "value": "ASA",
+          "key": 4,
+          "label": "Acrylonitrile Styrene Acrylate"
+        },
+        {
+          "value": "PC",
+          "key": 5,
+          "label": "Polycarbonate"
+        },
+        {
+          "value": "PCTG",
+          "key": 6,
+          "label": "Polycyclohexylenedimethylene Terephthalate Glycol"
+        },
+        {
+          "value": "PP",
+          "key": 7,
+          "label": "Polypropylene"
+        },
+        {
+          "value": "PA6",
+          "key": 8,
+          "label": "Polyamide 6"
+        },
+        {
+          "value": "PA11",
+          "key": 9,
+          "label": "Polyamide 11"
+        },
+        {
+          "value": "PA12",
+          "key": 10,
+          "label": "Polyamide 12"
+        },
+        {
+          "value": "PA612",
+          "key": 42,
+          "label": "Polyamide 612"
+        },
+        {
+          "value": "PA66",
+          "key": 11,
+          "label": "Polyamide 66"
+        },
+        {
+          "value": "CPE",
+          "key": 12,
+          "label": "Copolyester"
+        },
+        {
+          "value": "TPE",
+          "key": 13,
+          "label": "Thermoplastic Elastomer"
+        },
+        {
+          "value": "HIPS",
+          "key": 14,
+          "label": "High Impact Polystyrene"
+        },
+        {
+          "value": "PHA",
+          "key": 15,
+          "label": "Polyhydroxyalkanoate"
+        },
+        {
+          "value": "PET",
+          "key": 16,
+          "label": "Polyethylene Terephthalate"
+        },
+        {
+          "value": "PEI",
+          "key": 17,
+          "label": "Polyetherimide"
+        },
+        {
+          "value": "PBT",
+          "key": 18,
+          "label": "Polybutylene Terephthalate"
+        },
+        {
+          "value": "PVB",
+          "key": 19,
+          "label": "Polyvinyl Butyral"
+        },
+        {
+          "value": "PVA",
+          "key": 20,
+          "label": "Polyvinyl Alcohol"
+        },
+        {
+          "value": "PEKK",
+          "key": 21,
+          "label": "Polyetherketoneketone"
+        },
+        {
+          "value": "PEEK",
+          "key": 22,
+          "label": "Polyether Ether Ketone"
+        },
+        {
+          "value": "BVOH",
+          "key": 23,
+          "label": "Butenediol Vinyl Alcohol Copolymer"
+        },
+        {
+          "value": "TPC",
+          "key": 24,
+          "label": "Thermoplastic Copolyester"
+        },
+        {
+          "value": "PPS",
+          "key": 25,
+          "label": "Polyphenylene Sulfide"
+        },
+        {
+          "value": "PPSU",
+          "key": 26,
+          "label": "Polyphenylsulfone"
+        },
+        {
+          "value": "PVC",
+          "key": 27,
+          "label": "Polyvinyl Chloride"
+        },
+        {
+          "value": "PEBA",
+          "key": 28,
+          "label": "Polyether Block Amide"
+        },
+        {
+          "value": "PVDF",
+          "key": 29,
+          "label": "Polyvinylidene Fluoride"
+        },
+        {
+          "value": "PPA",
+          "key": 30,
+          "label": "Polyphthalamide"
+        },
+        {
+          "value": "PCL",
+          "key": 31,
+          "label": "Polycaprolactone"
+        },
+        {
+          "value": "PES",
+          "key": 32,
+          "label": "Polyethersulfone"
+        },
+        {
+          "value": "PMMA",
+          "key": 33,
+          "label": "Polymethyl Methacrylate"
+        },
+        {
+          "value": "POM",
+          "key": 34,
+          "label": "Polyoxymethylene"
+        },
+        {
+          "value": "PPE",
+          "key": 35,
+          "label": "Polyphenylene Ether"
+        },
+        {
+          "value": "PS",
+          "key": 36,
+          "label": "Polystyrene"
+        },
+        {
+          "value": "PSU",
+          "key": 37,
+          "label": "Polysulfone"
+        },
+        {
+          "value": "TPI",
+          "key": 38,
+          "label": "Thermoplastic Polyimide"
+        },
+        {
+          "value": "SBS",
+          "key": 39,
+          "label": "Styrene-Butadiene-Styrene"
+        },
+        {
+          "value": "OBC",
+          "key": 40,
+          "label": "Olefin Block Copolymer"
+        },
+        {
+          "value": "EVA",
+          "key": 41,
+          "label": "Ethylene Vinyl Acetate"
+        }
+      ]
+    },
+    {
+      "key": 10,
+      "name": "material_name",
+      "type": "string",
+      "max_length": 63,
+      "example": "PC Blend Carbon Fiber Black",
+      "required": "recommended",
+      "description": [
+        "Brand-specific material display string/identifier.",
+        "In the UI, brand_name + material_name should be displayed together, for example \"Prusament PLA Galaxy Black\"."
+      ]
+    },
+    {
+      "key": 52,
+      "name": "material_abbreviation",
+      "type": "string",
+      "max_length": 7,
+      "example": "PCCF",
+      "description": [
+        "Abbreviation of the material name, for UI purposes (footers, dashboards, ...).",
+        "If not present, the material inherits the abbreviation from the material type."
+      ]
+    },
+    {
+      "key": 11,
+      "name": "brand_name",
+      "type": "string",
+      "max_length": 31,
+      "required": "recommended",
+      "description": "Brand of the material.",
+      "example": "Prusament"
+    },
+    {
+      "key": 13,
+      "name": "write_protection",
+      "type": "enum",
+      "items_file": "write_protection_enum.yaml",
+      "description": [
+        "Indicates whether the tag is write protected (everything except aux section, that one should be always writable).",
+        "See the _Write protection_ section."
+      ],
+      "options": [
+        {
+          "value": "no",
+          "key": 0,
+          "label": "no"
+        },
+        {
+          "value": "irreversible",
+          "key": 1,
+          "label": "irreversible"
+        },
+        {
+          "value": "protect_page_unlockable",
+          "key": 2,
+          "label": "protect_page_unlockable"
+        }
+      ]
+    },
+    {
+      "key": 14,
+      "name": "manufactured_date",
+      "type": "timestamp",
+      "required": "recommended"
+    },
+    {
+      "key": 55,
+      "name": "country_of_origin",
+      "type": "string",
+      "max_length": 2,
+      "description": "Country the [MaterialPackageInstance](terminology) was produced in, encoded as a two-letter code according to [ISO 3166-1 alpha-2](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2)."
+    },
+    {
+      "key": 15,
+      "name": "expiration_date",
+      "type": "timestamp"
+    },
+    {
+      "key": 16,
+      "name": "nominal_netto_full_weight",
+      "required": "recommended",
+      "type": "number",
+      "unit": "g",
+      "example": 1000,
+      "description": [
+        "Nominal/advertised weight of the full package of the material, excluding the container.",
+        "The actual netto weight of a specific package instance can slightly differ and is specified by `actual_netto_full_weight`."
+      ]
+    },
+    {
+      "key": 17,
+      "name": "actual_netto_full_weight",
+      "required": "recommended",
+      "type": "number",
+      "unit": "g",
+      "example": 1012,
+      "description": [
+        "Actual weight of the full package of the material of this specific package instance, excluding the weight of the container.",
+        "Can slightly differ from `nominal_netto_full_weight`.",
+        "If not present, `nominal_netto_full_weight` SHALL be used as a fallback."
+      ]
+    },
+    {
+      "key": 53,
+      "name": "nominal_full_length",
+      "required": "recommended",
+      "category": "fff",
+      "type": "number",
+      "unit": "mm",
+      "example": 350000,
+      "description": [
+        "Nominal/advertised filament length of the full spool.",
+        "The actual length of a specific package instance can slightly differ and is specified by `actual_full_length`"
+      ]
+    },
+    {
+      "key": 54,
+      "name": "actual_full_length",
+      "required": "recommended",
+      "category": "fff",
+      "type": "number",
+      "unit": "mm",
+      "example": 351000,
+      "description": [
+        "Actual filament length of the full spool.",
+        "Can slightly differ from `nominal_full_length`.",
+        "If not present, `nominal_full_length` SHALL be used as a fallback."
+      ]
+    },
+    {
+      "key": 18,
+      "name": "empty_container_weight",
+      "required": "recommended",
+      "type": "number",
+      "unit": "g",
+      "description": "Weight of the empty container."
+    },
+    {
+      "key": 19,
+      "name": "primary_color",
+      "type": "color_rgba",
+      "required": "recommended",
+      "example": "`\\xff\\x00\\x00\\x7f`",
+      "description": [
+        "Primary color of the material in the RGB(A) format, intended for UI purposes.",
+        "The alpha channel can be left out, in which case the data should have 3 bytes instead of 4 and the color will be considered fully opaque.",
+        "If a material doesn't have a single primary color (for example rainbow or coextruded filaments), this field SHOULD be omitted."
+      ]
+    },
+    {
+      "key": 59,
+      "name": "primary_color_lab",
+      "type": "color_lab",
+      "unit": "[L*, a*, b*]",
+      "example": "[53.24, 111.12, -27.3]",
+      "description": [
+        "Color of a material in the device-independent CIE L*a*b* (CIELAB 1976) color space with reference white D65/2\u00b0.",
+        "If present, the value MUST be obtained by physical spectrometry measurement; it MUST NOT be approximated (for example from RGB).",
+        "`L*` is bound to [0, 100], `a*` and `b*` values are dimensionless and are typically between \u00b1127, but can theoretically get in the \u00b1150 range."
+      ]
+    },
+    {
+      "key": 60,
+      "name": "primary_color_ral",
+      "type": "string",
+      "unit": "RAL code",
+      "max_length": 16,
+      "example": "270 30 20",
+      "description": [
+        "RAL color identifier, without the \"RAL\" prefix.",
+        "The value MUST correspond exactly to an official identifier (see https://www.ral-farben.de/en/all-ral-colours).",
+        "If present, the physical material MUST match the referenced RAL swatch; it MUST NOT be approximated (for example from RGB/LAB).",
+        "Examples of valid values: `3020`, `9005`, `1023`, `7016`, `270 30 20`, `190 50 35`, `530-1`, `850-M`, `P1 3020`."
+      ]
+    },
+    {
+      "key": 20,
+      "name": "secondary_color_0",
+      "type": "color_rgba",
+      "description": [
+        "One of secondary colors of the material.",
+        "Data format is the same as for `primary_color`."
+      ]
+    },
+    {
+      "key": 21,
+      "name": "secondary_color_1",
+      "type": "color_rgba",
+      "description": "See `secondary_color_0`."
+    },
+    {
+      "key": 22,
+      "name": "secondary_color_2",
+      "type": "color_rgba",
+      "description": "See `secondary_color_0`."
+    },
+    {
+      "key": 23,
+      "name": "secondary_color_3",
+      "type": "color_rgba",
+      "description": "See `secondary_color_0`."
+    },
+    {
+      "key": 24,
+      "name": "secondary_color_4",
+      "type": "color_rgba",
+      "description": "See `secondary_color_0`."
+    },
+    {
+      "key": 27,
+      "name": "transmission_distance",
+      "type": "number",
+      "example": 6.6,
+      "unit": "HueForge TD",
+      "description": [
+        "Transmission Distance is a number representing material opacity.",
+        "Value ranges from 0.1 (least transparent/most opaque) to 100 (most transparent/least opaque).",
+        "See [Prusa TD values](https://help.prusa3d.com/article/hueforge-filament-transparency-values-and-hexcodes_762314) or [HueForge website](https://shop.thehueforge.com/blogs/news/what-is-hueforge)."
+      ]
+    },
+    {
+      "key": 28,
+      "name": "tags",
+      "type": "enum_array",
+      "max_length": 16,
+      "items_file": "tags_enum.yaml",
+      "example": "glitter + dual_color",
+      "required": "recommended",
+      "description": "Properties of the material. Can have multiple tags at once.",
+      "options": [
+        {
+          "value": "filtration_recommended",
+          "key": 0,
+          "label": "filtration_recommended"
+        },
+        {
+          "value": "biocompatible",
+          "key": 1,
+          "label": "biocompatible"
+        },
+        {
+          "value": "home_compostable",
+          "key": 61,
+          "label": "home_compostable"
+        },
+        {
+          "value": "industrially_compostable",
+          "key": 62,
+          "label": "industrially_compostable"
+        },
+        {
+          "value": "bio_based",
+          "key": 63,
+          "label": "bio_based"
+        },
+        {
+          "value": "antibacterial",
+          "key": 2,
+          "label": "antibacterial"
+        },
+        {
+          "value": "air_filtering",
+          "key": 3,
+          "label": "air_filtering"
+        },
+        {
+          "value": "abrasive",
+          "key": 4,
+          "label": "abrasive"
+        },
+        {
+          "value": "foaming",
+          "key": 5,
+          "label": "foaming"
+        },
+        {
+          "value": "castable",
+          "key": 67,
+          "label": "castable"
+        },
+        {
+          "value": "self_extinguishing",
+          "key": 6,
+          "label": "self_extinguishing"
+        },
+        {
+          "value": "paramagnetic",
+          "key": 7,
+          "label": "paramagnetic"
+        },
+        {
+          "value": "radiation_shielding",
+          "key": 8,
+          "label": "radiation_shielding"
+        },
+        {
+          "value": "high_temperature",
+          "key": 9,
+          "label": "high_temperature"
+        },
+        {
+          "value": "high_speed",
+          "key": 71,
+          "label": "high_speed"
+        },
+        {
+          "value": "uv_resistant",
+          "key": 73,
+          "label": "uv_resistant"
+        },
+        {
+          "value": "esd_safe",
+          "key": 10,
+          "label": "esd_safe"
+        },
+        {
+          "value": "conductive",
+          "key": 11,
+          "label": "conductive"
+        },
+        {
+          "value": "emi_shielding",
+          "key": 70,
+          "label": "emi_shielding"
+        },
+        {
+          "value": "blend",
+          "key": 12,
+          "label": "blend"
+        },
+        {
+          "value": "water_soluble",
+          "key": 13,
+          "label": "water_soluble"
+        },
+        {
+          "value": "ipa_soluble",
+          "key": 14,
+          "label": "ipa_soluble"
+        },
+        {
+          "value": "limonene_soluble",
+          "key": 15,
+          "label": "limonene_soluble"
+        },
+        {
+          "value": "acetone_soluble",
+          "key": 74,
+          "label": "acetone_soluble"
+        },
+        {
+          "value": "low_outgassing",
+          "key": 64,
+          "label": "low_outgassing"
+        },
+        {
+          "value": "matte",
+          "key": 16,
+          "label": "matte"
+        },
+        {
+          "value": "silk",
+          "key": 17,
+          "label": "silk"
+        },
+        {
+          "value": "translucent",
+          "key": 19,
+          "label": "translucent"
+        },
+        {
+          "value": "transparent",
+          "key": 20,
+          "label": "transparent"
+        },
+        {
+          "value": "without_pigments",
+          "key": 65,
+          "label": "without_pigments"
+        },
+        {
+          "value": "iridescent",
+          "key": 21,
+          "label": "iridescent"
+        },
+        {
+          "value": "pearlescent",
+          "key": 22,
+          "label": "pearlescent"
+        },
+        {
+          "value": "glitter",
+          "key": 23,
+          "label": "glitter"
+        },
+        {
+          "value": "glow_in_the_dark",
+          "key": 24,
+          "label": "glow_in_the_dark"
+        },
+        {
+          "value": "neon",
+          "key": 25,
+          "label": "neon"
+        },
+        {
+          "value": "illuminescent_color_change",
+          "key": 26,
+          "label": "illuminescent_color_change"
+        },
+        {
+          "value": "temperature_color_change",
+          "key": 27,
+          "label": "temperature_color_change"
+        },
+        {
+          "value": "gradual_color_change",
+          "key": 28,
+          "label": "gradual_color_change"
+        },
+        {
+          "value": "coextruded",
+          "key": 29,
+          "label": "coextruded"
+        },
+        {
+          "value": "contains_carbon",
+          "key": 30,
+          "label": "contains_carbon"
+        },
+        {
+          "value": "contains_carbon_fiber",
+          "key": 31,
+          "label": "contains_carbon_fiber"
+        },
+        {
+          "value": "contains_carbon_nano_tubes",
+          "key": 32,
+          "label": "contains_carbon_nano_tubes"
+        },
+        {
+          "value": "contains_graphene",
+          "key": 72,
+          "label": "contains_graphene"
+        },
+        {
+          "value": "contains_glass",
+          "key": 33,
+          "label": "contains_glass"
+        },
+        {
+          "value": "contains_glass_fiber",
+          "key": 34,
+          "label": "contains_glass_fiber"
+        },
+        {
+          "value": "contains_kevlar",
+          "key": 35,
+          "label": "contains_kevlar"
+        },
+        {
+          "value": "contains_ptfe",
+          "key": 68,
+          "label": "contains_ptfe"
+        },
+        {
+          "value": "contains_stone",
+          "key": 36,
+          "label": "contains_stone"
+        },
+        {
+          "value": "contains_magnetite",
+          "key": 37,
+          "label": "contains_magnetite"
+        },
+        {
+          "value": "contains_organic_material",
+          "key": 38,
+          "label": "contains_organic_material"
+        },
+        {
+          "value": "contains_cork",
+          "key": 39,
+          "label": "contains_cork"
+        },
+        {
+          "value": "contains_wax",
+          "key": 40,
+          "label": "contains_wax"
+        },
+        {
+          "value": "contains_wood",
+          "key": 41,
+          "label": "contains_wood"
+        },
+        {
+          "value": "contains_algae",
+          "key": 66,
+          "label": "contains_algae"
+        },
+        {
+          "value": "contains_bamboo",
+          "key": 42,
+          "label": "contains_bamboo"
+        },
+        {
+          "value": "contains_pine",
+          "key": 43,
+          "label": "contains_pine"
+        },
+        {
+          "value": "contains_ceramic",
+          "key": 44,
+          "label": "contains_ceramic"
+        },
+        {
+          "value": "contains_boron_carbide",
+          "key": 45,
+          "label": "contains_boron_carbide"
+        },
+        {
+          "value": "contains_metal",
+          "key": 46,
+          "label": "contains_metal"
+        },
+        {
+          "value": "contains_bronze",
+          "key": 47,
+          "label": "contains_bronze"
+        },
+        {
+          "value": "contains_iron",
+          "key": 48,
+          "label": "contains_iron"
+        },
+        {
+          "value": "contains_steel",
+          "key": 49,
+          "label": "contains_steel"
+        },
+        {
+          "value": "contains_silver",
+          "key": 50,
+          "label": "contains_silver"
+        },
+        {
+          "value": "contains_copper",
+          "key": 51,
+          "label": "contains_copper"
+        },
+        {
+          "value": "contains_aluminium",
+          "key": 52,
+          "label": "contains_aluminium"
+        },
+        {
+          "value": "contains_brass",
+          "key": 53,
+          "label": "contains_brass"
+        },
+        {
+          "value": "contains_tungsten",
+          "key": 54,
+          "label": "contains_tungsten"
+        },
+        {
+          "value": "imitates_wood",
+          "key": 55,
+          "label": "imitates_wood"
+        },
+        {
+          "value": "imitates_metal",
+          "key": 56,
+          "label": "imitates_metal"
+        },
+        {
+          "value": "imitates_marble",
+          "key": 57,
+          "label": "imitates_marble"
+        },
+        {
+          "value": "imitates_stone",
+          "key": 58,
+          "label": "imitates_stone"
+        },
+        {
+          "value": "lithophane",
+          "key": 59,
+          "label": "lithophane"
+        },
+        {
+          "value": "recycled",
+          "key": 60,
+          "label": "recycled"
+        },
+        {
+          "value": "limited_edition",
+          "key": 69,
+          "label": "limited_edition"
+        }
+      ]
+    },
+    {
+      "key": 56,
+      "name": "certifications",
+      "type": "enum_array",
+      "max_length": 8,
+      "items_file": "material_certifications_enum.yaml",
+      "example": "`ul_2818`",
+      "description": "Certifications the material has.",
+      "options": [
+        {
+          "value": "ul_2818",
+          "key": 0,
+          "label": "ul_2818"
+        },
+        {
+          "value": "ul_94_v0",
+          "key": 1,
+          "label": "ul_94_v0"
+        },
+        {
+          "value": "ul_2904",
+          "key": 2,
+          "label": "ul_2904"
+        }
+      ]
+    },
+    {
+      "key": 29,
+      "name": "density",
+      "type": "number",
+      "unit": "g/cm\u00b3 (1 g/cm\u00b3 = 0.001 g/mm\u00b3 = 1000 kg/m\u00b3)",
+      "example": 1.24,
+      "required": "recommended",
+      "description": "Density of the material."
+    },
+    {
+      "key": 30,
+      "name": "filament_diameter",
+      "type": "number",
+      "unit": "mm",
+      "example": 2.85,
+      "category": "fff",
+      "description": [
+        "Diameter of the filament, in mm.",
+        "If not present, 1.75 mm is assumed."
+      ]
+    },
+    {
+      "key": 31,
+      "name": "hardness_shore_a",
+      "type": "int",
+      "example": 95,
+      "description": [
+        "Hardness of the material on the Shore A hardness scale (suitable for softer materials).",
+        "**Note:** There is no 1:1 mapping between A and D scales, different materials can have different values on one scale even though they are the same on the other."
+      ]
+    },
+    {
+      "key": 32,
+      "name": "hardness_shore_d",
+      "type": "int",
+      "example": 30,
+      "description": [
+        "Hardness of the material on the Shore D hardness scale (suitable for harder materials).",
+        "**Note:** There is no 1:1 mapping between A and D scales, different materials can have different values on one scale even though they are the same on the other."
+      ]
+    },
+    {
+      "key": 33,
+      "name": "min_nozzle_diameter",
+      "type": "number",
+      "example": 0.4,
+      "unit": "mm",
+      "category": "fff",
+      "description": [
+        "Filaments can contain particles that would clog smaller nozzles.",
+        "This field specifies minimum nozzle diameter recommended for printing this material."
+      ]
+    },
+    {
+      "key": 34,
+      "name": "min_print_temperature",
+      "type": "int",
+      "unit": "\u00b0C",
+      "example": 205,
+      "required": "recommended",
+      "category": "fff",
+      "description": [
+        "Minimum recommended nozzle temperature for printing.",
+        "Also used for loading the filament to the nozzle."
+      ]
+    },
+    {
+      "key": 35,
+      "name": "max_print_temperature",
+      "type": "int",
+      "unit": "\u00b0C",
+      "example": 225,
+      "required": "recommended",
+      "category": "fff",
+      "description": [
+        "Maximum recommended nozzle temperature for printing.",
+        "Also used for loading the filament to the nozzle."
+      ]
+    },
+    {
+      "key": 36,
+      "name": "preheat_temperature",
+      "type": "int",
+      "unit": "\u00b0C",
+      "example": 170,
+      "category": "fff",
+      "required": "recommended",
+      "description": [
+        "Recommended nozzle temperature for preheating/load cell bed leveling.",
+        "Should be large enough for the material to get soft, but not low enough for it no to drip out of the nozzle."
+      ]
+    },
+    {
+      "key": 37,
+      "name": "min_bed_temperature",
+      "type": "int",
+      "unit": "\u00b0C",
+      "example": 60,
+      "category": "fff",
+      "required": "recommended",
+      "description": [
+        "Minimum recommended heatbed temperature."
+      ]
+    },
+    {
+      "key": 38,
+      "name": "max_bed_temperature",
+      "type": "int",
+      "unit": "\u00b0C",
+      "example": 60,
+      "category": "fff",
+      "required": "recommended",
+      "description": [
+        "Maximum recommended heatbed temperature."
+      ]
+    },
+    {
+      "key": 39,
+      "name": "min_chamber_temperature",
+      "type": "int",
+      "unit": "\u00b0C",
+      "example": 10,
+      "category": "fff",
+      "description": [
+        "Minimum recommended temperature of the chamber."
+      ]
+    },
+    {
+      "key": 40,
+      "name": "max_chamber_temperature",
+      "type": "int",
+      "unit": "\u00b0C",
+      "example": 50,
+      "category": "fff",
+      "description": [
+        "Maximum recommended temperature of the chamber."
+      ]
+    },
+    {
+      "key": 41,
+      "name": "chamber_temperature",
+      "type": "int",
+      "unit": "\u00b0C",
+      "example": 20,
+      "category": "fff",
+      "description": [
+        "Ideal chamber temperature for printing."
+      ]
+    },
+    {
+      "key": 42,
+      "name": "container_width",
+      "type": "int",
+      "unit": "mm",
+      "example": 75,
+      "category": "fff",
+      "description": [
+        "Width of the filament spool. Can be useful to know for spool holders, dry boxes and such."
+      ]
+    },
+    {
+      "key": 43,
+      "name": "container_outer_diameter",
+      "type": "int",
+      "unit": "mm",
+      "example": 200,
+      "category": "fff",
+      "description": [
+        "Diameter of the spool. Can be useful to know for spool holders, dry boxes and such."
+      ]
+    },
+    {
+      "key": 44,
+      "name": "container_inner_diameter",
+      "type": "int",
+      "unit": "mm",
+      "example": 100,
+      "category": "fff",
+      "description": [
+        "Diameter of the inner cylinder the filament is spooled once.",
+        "Equals to the minimum diameter of the filament winding."
+      ]
+    },
+    {
+      "key": 45,
+      "name": "container_hole_diameter",
+      "type": "int",
+      "unit": "mm",
+      "example": 52,
+      "category": "fff",
+      "description": [
+        "Diameter of the center hole of the spool."
+      ]
+    },
+    {
+      "key": 46,
+      "name": "viscosity_18c",
+      "type": "number",
+      "unit": "mPa\u00b7s",
+      "description": "Viscosity of the material at 18 \u00b0C.",
+      "category": "sla"
+    },
+    {
+      "key": 47,
+      "name": "viscosity_25c",
+      "type": "number",
+      "unit": "mPa\u00b7s",
+      "description": "Viscosity of the material at 25 \u00b0C.",
+      "category": "sla",
+      "example": 80
+    },
+    {
+      "key": 48,
+      "name": "viscosity_40c",
+      "type": "number",
+      "unit": "mPa\u00b7s",
+      "description": "Viscosity of the material at 40 \u00b0C.",
+      "category": "sla"
+    },
+    {
+      "key": 49,
+      "name": "viscosity_60c",
+      "type": "number",
+      "unit": "mPa\u00b7s",
+      "description": "Viscosity of the material at 60 \u00b0C.",
+      "category": "sla"
+    },
+    {
+      "key": 50,
+      "name": "container_volumetric_capacity",
+      "type": "number",
+      "unit": "ml (cm\u00b3)",
+      "category": "sla",
+      "description": "Maximum amount of material the container can hold."
+    },
+    {
+      "key": 51,
+      "name": "cure_wavelength",
+      "type": "int",
+      "unit": "nm",
+      "example": 405,
+      "category": "sla",
+      "description": [
+        "Wavelength of the light the material has been designed to be cured with."
+      ]
+    },
+    {
+      "key": 57,
+      "name": "drying_temperature",
+      "type": "int",
+      "unit": "\u00b0C",
+      "example": 45,
+      "category": "fff",
+      "description": [
+        "Recommended ambient temperature for drying."
+      ]
+    },
+    {
+      "key": 58,
+      "name": "drying_time",
+      "type": "int",
+      "unit": "min",
+      "example": 480,
+      "category": "fff",
+      "description": [
+        "Recommended drying time (at `drying_temperature`)."
+      ]
+    }
+  ],
+  "aux": [
+    {
+      "key": 0,
+      "name": "consumed_weight",
+      "type": "number",
+      "unit": "g",
+      "description": [
+        "Amount of material that was used up from the container.",
+        "`remaining_weight` = `instance_netto_full_weight` - `consumed_weight`"
+      ]
+    },
+    {
+      "key": 1,
+      "name": "workgroup",
+      "type": "string",
+      "max_length": 8,
+      "description": [
+        "Workgroup identifier, used for detecting first usage of the material.",
+        "See the _write protection_ section."
+      ]
+    },
+    {
+      "key": 2,
+      "name": "general_purpose_range_user",
+      "type": "string",
+      "example": "Prusa",
+      "max_length": 8,
+      "description": [
+        "Determines semantics of the fields in the general purpose key range.",
+        "MUST be filled if any of the general purpose keys is used.",
+        "See _Vendor-specific fields_."
+      ]
+    },
+    {
+      "key": 3,
+      "name": "last_stir_time",
+      "category": "sla",
+      "type": "timestamp",
+      "description": [
+        "Timestamp when the resin was last stirred.",
+        "Resins that have not been used for some time should be stirred before printing."
+      ]
+    },
+    {
+      "key": 4,
+      "name": "storage_location",
+      "type": "string",
+      "example": "Shelf B3",
+      "max_length": 8,
+      "description": [
+        "Free-form identifier for the physical storage location of the container.",
+        "Intended for inventory management workflows (e.g. \"Shelf B3\", \"DB2/S4\")."
+      ]
+    },
+    {
+      "key": 5,
+      "name": "purchase_time",
+      "type": "timestamp",
+      "category": "user_data",
+      "description": [
+        "Timestamp when the material package was purchased by the customer.",
+        "Not filled by the manufacturer, for customer private tracking only."
+      ]
+    },
+    {
+      "key": 6,
+      "name": "purchase_price",
+      "type": "number",
+      "category": "user_data",
+      "description": [
+        "Amount (of `purchase_currency`) the user paid for the material package.",
+        "Not filled by the manufacturer, for customer private tracking only."
+      ]
+    },
+    {
+      "key": 7,
+      "name": "purchase_currency",
+      "type": "string",
+      "max_length": 3,
+      "category": "user_data",
+      "description": [
+        "Currency of `purchase_price`.",
+        "Alphabetic code according to [ISO 4271](https://en.wikipedia.org/wiki/ISO_4217).",
+        "Not filled by the manufacturer, for customer private tracking only."
+      ]
+    }
+  ]
+}

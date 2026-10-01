@@ -1,4 +1,6 @@
 <script lang="ts">
+	import WriteTagModal from './WriteTagModal.svelte';
+	let writeOpen = $state(false);
 	// The NFC/RFID tags linked to a spool or filament, listed in its inspector.
 	//
 	// A tag is identified by its hardware UID and nothing else, so there is very
@@ -60,6 +62,9 @@
 <SectionLabel>
 	{m['tags.section']()}
 	{#snippet right()}
+		{#if kind === 'spool'}<button class="link" onclick={() => (writeOpen = true)}
+				><Nfc size={13} />Scrivi tag</button
+			>{/if}
 		<button class="link" onclick={() => (addOpen = true)}>
 			<Plus size={13} />
 			{m['tags.add']()}
@@ -89,6 +94,8 @@
 {:else}
 	<div class="none">{m['tags.none']()}</div>
 {/if}
+
+{#if writeOpen}<WriteTagModal {id} onclose={() => (writeOpen = false)} />{/if}
 
 <AddTagModal open={addOpen} {kind} {id} onclose={() => (addOpen = false)} />
 
