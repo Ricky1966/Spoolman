@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 DATA = Path(__file__).with_name("openprinttag_data")
 CATALOG = json.loads((DATA / "fields.json").read_text())
 MIME = b"application/vnd.openprinttag"
-CAPACITY = 320
+CAPACITY = 316  # ICODE SLIX2 user memory: blocks 0-78; block 79 is the NXP counter
 INLINE_LIMIT = 24
 PRECISION = 0.001
 LAB_COMPONENTS = 3
@@ -196,11 +196,11 @@ def make_image(main: dict[str, Any], aux: dict[str, Any], uid: str) -> tuple[byt
     main.setdefault("instance_uuid", str(uuid.uuid5(uuid.NAMESPACE_OID, "OpenPrintTag:" + uid)))
     _validate_fff(main, aux)
     main_bytes, aux_bytes = encode_region("main", main), encode_region("aux", aux)
-    # Extended TLV + long MIME NDEF record, filling all 320 bytes. Aux starts
-    # at absolute byte 284, a block boundary, with 35 bytes until the terminator.
+    # Extended TLV + long MIME NDEF record, filling all 316 bytes. Aux starts
+    # at absolute byte 280, a block boundary, with 35 bytes until the terminator.
     payload_start = 8 + 6 + len(MIME)
-    payload_size = 319 - payload_start
-    aux_offset = 284 - payload_start
+    payload_size = 315 - payload_start
+    aux_offset = 280 - payload_start
     meta = cbor({2: aux_offset})
     if len(meta) + len(main_bytes) > aux_offset:
         raise ValueError(
@@ -214,7 +214,7 @@ def make_image(main: dict[str, Any], aux: dict[str, Any], uid: str) -> tuple[byt
     payload[len(meta) : len(meta) + len(main_bytes)] = main_bytes
     payload[aux_offset : aux_offset + len(aux_bytes)] = aux_bytes
     ndef = bytes([0xC2, len(MIME)]) + struct.pack(">I", len(payload)) + MIME + payload
-    image = b"\xe1\x40\x28\x01\x03\xff" + struct.pack(">H", len(ndef)) + ndef + b"\xfe"
+    image = b"\xe1\x40\x27\x01\x03\xff" + struct.pack(">H", len(ndef)) + ndef + b"\xfe"
     _require(len(image) == CAPACITY, "Internal layout error")
     return image, {
         "main": main,

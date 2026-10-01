@@ -15,8 +15,8 @@ client. Create/save the spool first. The legacy React client is unchanged.
   enum arrays, UUID, UTC Unix timestamps, RGB/RGBA and LAB. Array fields accept JSON.
   The physical memory is finite: including every optional field at once is not
   possible. Oversize regions are rejected; fields are never silently discarded.
-- A 320-byte NFC-V image: CC, NDEF MIME record, metadata, main region and a
-  block-aligned auxiliary region. The main region has 238 bytes and aux 35 bytes.
+- A 316-byte NFC-V image (SLIX2 blocks 0-78; block 79 is a read-only counter): CC, NDEF MIME record, metadata, main region and a
+  block-aligned auxiliary region. The main region has 234 bytes and aux 35 bytes.
   A deterministic UUIDv5 based on the physical UID is used when instance_uuid is
   blank. Explicit UUIDs are accepted; do not copy a package identity to another spool.
 - A reader reservation made **before placing a tag**, which pauses the daemon's

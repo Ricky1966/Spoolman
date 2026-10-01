@@ -82,7 +82,7 @@ async def check_holder(db: AsyncSession, uid: str, spool_id: int) -> None:
 @router.get("/schema")
 async def schema() -> dict[str, Any]:
     """Expose the field catalog without bridge credentials."""
-    return {"enabled": configured(), "reader": "Phoenix USB", "capacity": 320, "fields": CATALOG}
+    return {"enabled": configured(), "reader": "Phoenix USB", "capacity": 316, "fields": CATALOG}
 
 
 @router.get("/defaults/{spool_id}")

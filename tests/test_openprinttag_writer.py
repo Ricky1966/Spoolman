@@ -26,9 +26,9 @@ MAIN = {
 
 def test_image_roundtrip_regions_and_alignment():
     image, preview = make_image(MAIN, {"consumed_weight": 12.5}, UID)
-    assert len(image) == 320
-    assert image[:4] == bytes.fromhex("e1402801")
-    assert int.from_bytes(image[6:8], "big") == 311
+    assert len(image) == 316
+    assert image[:4] == bytes.fromhex("e1402701")
+    assert int.from_bytes(image[6:8], "big") == 307
     assert image[-1] == 254
     mime_len = image[9]
     start = 8 + 6 + mime_len
@@ -113,7 +113,7 @@ async def test_commit_only_links_verified_and_never_replays(monkeypatch: pytest.
             "bridge": "b" * 48,
             "uid": UID,
             "spool_id": 1,
-            "image": "00" * 320,
+            "image": "00" * 316,
             "blank": True,
             "expires": math.inf,
             "state": "prepared",
@@ -139,7 +139,7 @@ async def test_link_failure_reported_separately(monkeypatch: pytest.MonkeyPatch)
         "bridge": "b" * 48,
         "uid": UID,
         "spool_id": 1,
-        "image": "00" * 320,
+        "image": "00" * 316,
         "blank": True,
         "expires": math.inf,
         "state": "prepared",

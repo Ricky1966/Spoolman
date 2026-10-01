@@ -171,7 +171,7 @@
 >
 	<header><h2 id="write-tag-title">Scrivi OpenPrintTag · Bobina #{id}</h2></header>
 	<p>
-		Lettore Phoenix USB · ICODE SLIX2 · 320 byte. Attendi che il lettore sia riservato, compila i dati,
+		Lettore Phoenix USB · ICODE SLIX2 · 316 byte. Attendi che il lettore sia riservato, compila i dati,
 		appoggia un solo tag e tienilo fermo fino alla conferma.
 	</p>
 	{#if error}<p class="error" role="alert">{error}</p>{/if}
