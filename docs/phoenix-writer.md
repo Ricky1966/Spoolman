@@ -1,5 +1,13 @@
 # Phoenix OpenPrintTag writer (experimental)
 
+## ⚠️ Disclaimer: use at your own risk
+
+This writer is an experimental hobby project, provided **"as is"**, without warranty of any kind. It means flashing firmware, wiring electronics, writing to NFC tags, sending commands to a printer's firmware (Klipper/Moonraker) and installing software on your computers. Mistakes, bugs or incompatibilities can cause failed prints, damage to your printer(s), your computer(s), the ESP32/PN5180 module, the tags or any other hardware or software, loss of data, or other harm.
+
+By building, installing, running or modifying anything here you accept that you do so **entirely at your own risk**. The author and the contributors are **not responsible or liable** for any damage or loss of any kind: printers, PCs, hardware, software, data or anything else. Test carefully, never leave a printer unattended, back up your configuration before changing it, and read the code before you run it. The warranty disclaimer of the AGPL-3.0 licence (sections 15 and 16) applies as well.
+
+*In italiano: progetto sperimentale da usare **a proprio rischio e pericolo**. L'autore non risponde di alcun danno a stampanti, computer, hardware, software o dati.*
+
 This fork adds **Scrivi tag** to the Tags section of a saved spool in the Svelte
 client. Create/save the spool first. The legacy React client is unchanged.
 
@@ -131,3 +139,28 @@ queue; no second serial descriptor is opened by HTTP requests.
   the real HTTP bridge and an emulated serial firmware. Physical UI-to-Phoenix
   validation passed on 1 Oct 2026: write from the Spoolman UI, firmware verification,
   association to the spool and re-scan without a duplicate.
+
+## Blank tag on the reader (offer to write)
+
+Needs the `claude/blank-tag-flow` changes of Phoenix-OpenTag (firmware, daemon and bridge:
+`PHOENIX-BLANK`, `/blank`, `write-resume`) and a configured writer (`SPOOLMAN_WRITER_URL` and
+token).
+
+When an empty ICODE SLIX2 tag is placed on the reader and the printer is idle, the daemon sends
+Spoolman a scan with `format: "openprinttag-blank"` through the existing `/api/v1/tag/scan`
+relay. Any open browser then shows **Tag vuoto rilevato**:
+
+1. The spools without a tag are listed. If there is exactly one it is preselected; with several the
+   user picks the spool the tag was stuck on; with none the dialog explains that the spool must be
+   created first. A UID already linked to a spool (a wiped tag) offers only that spool.
+2. **Scrivi su questa bobina** opens the normal write dialog with the reader already reserved and the
+   preview prepared (no second tag placement). Nothing is written until **Conferma e scrivi tag**.
+3. If the tag on the reader is not the one the prompt offered, confirmation is disabled.
+4. After a verified write and association, closing the dialog makes the reader read the tag again
+   (`write-resume`): the normal lookup runs and Moonraker activates the spool, with no need to
+   remove the tag.
+
+The daemon ignores the blank tag (no prompt) while Moonraker reports `printing`/`paused`,
+`idle_timeout` `Printing` (G-code running: macros, heating, filament load/unload), a write session
+is open, or Moonraker is unreachable. Only blank tags are offered: an occupied tag is never replaced
+automatically.

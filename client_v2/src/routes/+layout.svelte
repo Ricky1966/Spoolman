@@ -5,6 +5,9 @@
 	import AddSpoolModal from '$components/AddSpoolModal.svelte';
 	import QrScannerModal from '$components/QrScannerModal.svelte';
 	import Toaster from '$components/Toaster.svelte';
+	import BlankTagPrompt from '$components/BlankTagPrompt.svelte';
+	import WriteTagModal from '$components/WriteTagModal.svelte';
+	import { getJson } from '$lib/api/http';
 	import { ui } from '$lib/stores/ui.svelte';
 	import { settings } from '$lib/stores/settings.svelte';
 	import { serverInfo } from '$lib/stores/serverInfo.svelte';
@@ -24,6 +27,9 @@
 	import type { Snippet } from 'svelte';
 
 	let { children }: { children: Snippet } = $props();
+
+	// `format` of the scan the Phoenix daemon sends for a blank SLIX2 tag.
+	const BLANK_TAG_FORMAT = 'openprinttag-blank';
 
 	// Keep <html data-theme> in sync with the preference (and OS changes when set
 	// to "system"). The initial paint is already themed by the inline script in
@@ -65,6 +71,27 @@
 		return scanRelay.subscribe(scanner.pool, (scan) => {
 			scanner.receive(scan);
 			onScan(scan);
+		});
+	});
+
+	// A blank tag on the Phoenix reader: offer to write it. Only when the writer is
+	// configured on the server (otherwise this browser holds no relay socket), and
+	// never while a write dialog is already open. The daemon only sends it while the
+	// printer is idle; the user still confirms the spool and the preview.
+	let writerEnabled = $state(false);
+	let blankScan = $state<TagScan | null>(null);
+	let writeSpoolId = $state<number | null>(null);
+	let writeExpectedUid = $state<string | undefined>(undefined);
+	$effect(() => {
+		getJson<{ enabled: boolean }>('/writer/schema')
+			.then((schema) => (writerEnabled = schema.enabled === true))
+			.catch(() => (writerEnabled = false));
+	});
+	$effect(() => {
+		if (!writerEnabled) return;
+		return scanRelay.subscribe(scanner.pool, (scan) => {
+			if (scan.format !== BLANK_TAG_FORMAT || blankScan || writeSpoolId !== null) return;
+			blankScan = scan;
 		});
 	});
 
@@ -112,6 +139,8 @@
 	});
 
 	function onScan(scan: TagScan) {
+		// A blank tag is handled by the prompt above, not by "unknown tag" or navigation.
+		if (scan.format === BLANK_TAG_FORMAT) return;
 		// Read inside the handler, never in the effect body: depending on the route
 		// here would tear the socket down and rebuild it on every navigation.
 		// A page you are configuring reacts to nothing — not even the toast, which
@@ -169,6 +198,27 @@
 />
 
 <QrScannerModal open={ui.scannerOpen} onclose={() => ui.closeScanner()} />
+
+{#if blankScan}
+	<BlankTagPrompt
+		uid={blankScan.uid}
+		matchedSpoolId={blankScan.spool ? Number(blankScan.spool.id) : undefined}
+		onwrite={(id) => {
+			writeExpectedUid = blankScan?.uid;
+			blankScan = null;
+			writeSpoolId = id;
+		}}
+		onclose={() => (blankScan = null)}
+	/>
+{/if}
+{#if writeSpoolId !== null}
+	<WriteTagModal
+		id={writeSpoolId}
+		auto
+		expectedUid={writeExpectedUid}
+		onclose={() => (writeSpoolId = null)}
+	/>
+{/if}
 
 <Toaster />
 
