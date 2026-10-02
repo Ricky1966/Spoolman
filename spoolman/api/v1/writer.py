@@ -17,7 +17,7 @@ from spoolman.api.v1.models import Spool
 from spoolman.database import spool, tag
 from spoolman.database.database import get_db_session
 from spoolman.database.models import Spool as DBSpool
-from spoolman.openprinttag import CATALOG, make_image
+from spoolman.openprinttag import CAPACITY, CATALOG, make_image
 
 router = APIRouter(prefix="/writer", tags=["OpenPrintTag writer"])
 lock = asyncio.Lock()
@@ -33,6 +33,11 @@ class Prepare(BaseModel):
     spool_id: int = Field(gt=0)
     main: dict[str, Any]
     aux: dict[str, Any] = Field(default_factory=dict)
+
+
+class PrepareErase(BaseModel):
+    session: str = Field(min_length=32, max_length=64)
+    spool_id: int = Field(gt=0)
 
 
 class Commit(BaseModel):
@@ -160,6 +165,33 @@ async def prepare(body: Prepare, db: DB) -> dict[str, Any]:
         return {"session": current["id"], "uid": uid, "blank": info["blank"], "expires_seconds": 50, "preview": preview}
 
 
+@router.post("/prepare-erase")
+async def prepare_erase(body: PrepareErase, db: DB) -> dict[str, Any]:
+    """Bind an erase (an all-zero image) to the reserved reader's snapshot.
+
+    The tag on the reader must not belong to another spool or filament. It is erased by the same
+    verified write as any other tag, with the same backup, and unlinked from this spool afterwards.
+    """
+    async with lock:
+        current = require_session(body.session)
+        if current["state"] != "editing" or current["spool_id"] != body.spool_id:
+            raise HTTPException(409, "Invalid session for this spool")
+        await spool.get_by_id(db, body.spool_id)
+        info = await bridge("prepare", {"session": current["bridge"]})
+        uid = info["uid"]
+        await check_holder(db, uid, body.spool_id)
+        current.update(
+            uid=uid,
+            image=bytes(CAPACITY).hex(),
+            expires=time.monotonic() + 50,
+            state="prepared",
+            blank=info["blank"],
+            erase=True,
+            preview={},
+        )
+        return {"session": current["id"], "uid": uid, "blank": info["blank"], "expires_seconds": 50, "erase": True}
+
+
 @router.post("/commit")
 async def commit(body: Commit, db: DB) -> dict[str, Any]:
     """Write once and associate only after full readback verification."""
@@ -184,6 +216,8 @@ async def commit(body: Commit, db: DB) -> dict[str, Any]:
                 current["state"] = "failed"
                 current["result"] = {"verified": False, "linked": False, "reader_result": result}
                 return current["result"]
+            if current.get("erase"):
+                return await finish_erase(db, current, result)
             # NFC cannot participate in a DB transaction. Report partial success explicitly.
             try:
                 await tag.link_spool(db=db, spool_id=current["spool_id"], uid=current["uid"], tag_format="openprinttag")
@@ -215,6 +249,39 @@ async def commit(body: Commit, db: DB) -> dict[str, Any]:
                 "message": "Outcome unknown. Inspect the tag before another write.",
             }
             raise
+
+
+async def finish_erase(db: AsyncSession, current: dict[str, Any], result: dict[str, Any]) -> dict[str, Any]:
+    """After a verified erase, remove the tag's link to the spool. The tag is blank either way."""
+    unlinked = False
+    try:
+        holder = await tag.find_by_uid(db, current["uid"])
+        if isinstance(holder, DBSpool) and holder.id == current["spool_id"]:
+            await tag.unlink_spool(db=db, spool_id=current["spool_id"], uid=current["uid"])
+            unlinked = True
+    except Exception:
+        logger.exception("Tag erased but database unlink failed")
+        current["state"] = "unlink_failed"
+        current["result"] = {
+            "verified": True,
+            "erased": True,
+            "unlinked": False,
+            "uid": current["uid"],
+            "message": "Tag erased but its link to the spool could not be removed. Unlink it in the Tags section.",
+            "backup": result.get("backup"),
+        }
+        return current["result"]
+    # "erased", not "done": closing then releases the reader without re-reading the (now blank) tag.
+    current["state"] = "erased"
+    current["result"] = {
+        "verified": True,
+        "erased": True,
+        "unlinked": unlinked,
+        "uid": current["uid"],
+        "spool_id": current["spool_id"],
+        "backup": result.get("backup"),
+    }
+    return current["result"]
 
 
 def require_session(sid: str) -> dict[str, Any]:

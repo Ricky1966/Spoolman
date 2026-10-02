@@ -2,7 +2,7 @@
 
 import io
 import math
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import cbor2
 import pytest
@@ -197,3 +197,80 @@ async def test_occupied_tag_requires_confirmation_before_bridge(monkeypatch: pyt
         await writer.commit(writer.Commit(session="a" * 48), None)
     remote.assert_not_awaited()
     assert writer.state["session"]["state"] == "prepared"
+
+
+@pytest.mark.asyncio
+async def test_erase_writes_zeros_unlinks_only_after_verification(monkeypatch: pytest.MonkeyPatch):
+    bridge = AsyncMock()
+    unlink = AsyncMock()
+    link = AsyncMock()
+    monkeypatch.setattr(writer, "state", {})
+    monkeypatch.setattr(writer, "bridge", bridge)
+    monkeypatch.setattr(writer, "check_holder", AsyncMock())
+    monkeypatch.setattr(writer.spool, "get_by_id", AsyncMock())
+    monkeypatch.setattr(writer.tag, "unlink_spool", unlink)
+    monkeypatch.setattr(writer.tag, "link_spool", link)
+    holder = MagicMock(spec=writer.DBSpool)
+    holder.id = 1
+    monkeypatch.setattr(writer.tag, "find_by_uid", AsyncMock(return_value=holder))
+    for verified in (False, True):
+        unlink.reset_mock()
+        writer.state["session"] = {"id": "a" * 48, "bridge": "b" * 48, "spool_id": 1, "state": "editing"}
+        bridge.return_value = {"uid": UID, "blank": False}
+        prepared = await writer.prepare_erase(writer.PrepareErase(session="a" * 48, spool_id=1), None)
+        assert prepared["erase"] is True
+        assert writer.state["session"]["image"] == "00" * 316  # the firmware's erase image
+        bridge.return_value = {"verified": verified, "status": "verified" if verified else "verify_failed", "uid": UID}
+        result = await writer.commit(writer.Commit(session="a" * 48, replace=True), None)
+        assert unlink.await_count == int(verified)
+        link.assert_not_awaited()
+        if verified:
+            assert result["erased"]
+            assert result["unlinked"]
+            assert writer.state["session"]["state"] == "erased"
+        else:
+            assert not result["verified"]
+    writer.state["session"] = None
+
+
+@pytest.mark.asyncio
+async def test_erase_needs_replace_for_a_tag_with_data_and_refuses_foreign_tags(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(writer, "state", {})
+    monkeypatch.setattr(writer, "bridge", AsyncMock(return_value={"uid": UID, "blank": False}))
+    monkeypatch.setattr(writer.spool, "get_by_id", AsyncMock())
+    monkeypatch.setattr(writer, "check_holder", AsyncMock())
+    writer.state["session"] = {"id": "a" * 48, "bridge": "b" * 48, "spool_id": 1, "state": "editing"}
+    await writer.prepare_erase(writer.PrepareErase(session="a" * 48, spool_id=1), None)
+    with pytest.raises(HTTPException):
+        await writer.commit(writer.Commit(session="a" * 48, replace=False), None)
+    writer.state["session"] = {"id": "a" * 48, "bridge": "b" * 48, "spool_id": 1, "state": "editing"}
+    monkeypatch.setattr(writer, "check_holder", AsyncMock(side_effect=HTTPException(409, "other spool")))
+    with pytest.raises(HTTPException):
+        await writer.prepare_erase(writer.PrepareErase(session="a" * 48, spool_id=1), None)
+    assert writer.state["session"]["state"] == "editing"
+    writer.state["session"] = None
+
+
+@pytest.mark.asyncio
+async def test_unlink_failure_after_erase_reported_separately(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(writer, "bridge", AsyncMock(return_value={"verified": True, "status": "verified", "uid": UID}))
+    monkeypatch.setattr(writer, "check_holder", AsyncMock())
+    monkeypatch.setattr(writer.spool, "get_by_id", AsyncMock())
+    monkeypatch.setattr(writer.tag, "find_by_uid", AsyncMock(side_effect=RuntimeError("db unavailable")))
+    writer.state["session"] = {
+        "id": "a" * 48,
+        "bridge": "b" * 48,
+        "uid": UID,
+        "spool_id": 1,
+        "image": "00" * 316,
+        "blank": False,
+        "expires": math.inf,
+        "state": "prepared",
+        "erase": True,
+    }
+    result = await writer.commit(writer.Commit(session="a" * 48, replace=True), None)
+    assert result["verified"]
+    assert result["erased"]
+    assert not result["unlinked"]
+    assert writer.state["session"]["state"] == "unlink_failed"
+    writer.state["session"] = None
