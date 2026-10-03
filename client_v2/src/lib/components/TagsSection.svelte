@@ -1,6 +1,8 @@
 <script lang="ts">
 	import WriteTagModal from './WriteTagModal.svelte';
+	import EraseTagModal from './EraseTagModal.svelte';
 	let writeOpen = $state(false);
+	let eraseUid = $state<string | null>(null);
 	// The NFC/RFID tags linked to a spool or filament, listed in its inspector.
 	//
 	// A tag is identified by its hardware UID and nothing else, so there is very
@@ -19,6 +21,7 @@
 	import Plus from '@lucide/svelte/icons/plus';
 	import Nfc from '@lucide/svelte/icons/nfc';
 	import X from '@lucide/svelte/icons/x';
+	import Eraser from '@lucide/svelte/icons/eraser';
 	import type { Tag } from '$lib/types';
 	import { unlinkTag, type TagKind } from '$lib/api/tags';
 	import { toasts } from '$lib/stores/toasts.svelte';
@@ -80,6 +83,14 @@
 				<span class="uid mono">{tag.uid}</span>
 				{#if tag.format}<span class="fmt">{tag.format}</span>{/if}
 				<span class="added">{m['tags.addedOn']({ date: formatShortDate(tag.added) })}</span>
+				{#if kind === 'spool' && tag.format === 'openprinttag'}<button
+						class="unlink"
+						onclick={() => (eraseUid = tag.uid)}
+						title="Cancella il tag (torna vuoto) e scollegalo"
+						aria-label="Cancella tag"
+					>
+						<Eraser size={14} />
+					</button>{/if}
 				<button
 					class="unlink"
 					onclick={() => (pending = tag)}
@@ -95,6 +106,7 @@
 	<div class="none">{m['tags.none']()}</div>
 {/if}
 
+{#if eraseUid}<EraseTagModal {id} uid={eraseUid} onclose={() => (eraseUid = null)} />{/if}
 {#if writeOpen}<WriteTagModal {id} onclose={() => (writeOpen = false)} />{/if}
 
 <AddTagModal open={addOpen} {kind} {id} onclose={() => (addOpen = false)} />

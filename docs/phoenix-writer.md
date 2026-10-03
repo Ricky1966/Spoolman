@@ -164,3 +164,22 @@ The daemon ignores the blank tag (no prompt) while Moonraker reports `printing`/
 `idle_timeout` `Printing` (G-code running: macros, heating, filament load/unload), a write session
 is open, or Moonraker is unreachable. Only blank tags are offered: an occupied tag is never replaced
 automatically.
+
+## Erasing a tag (reuse)
+
+Each tag of a spool, in its **Tags** section, has a **Cancella tag** (eraser) button, so a tag can be reused.
+It needs the Phoenix firmware and daemon that accept the erase image (Phoenix-OpenTag branch `claude/erase-tag`
+or later) and a configured writer.
+
+1. The dialog reserves the reader. Place the tag on the reader and press **Leggi tag**.
+2. The UID on the reader must be the one being erased; otherwise confirmation stays disabled. A tag that is
+   linked to another spool or filament is refused.
+3. Tick the consent box and press **Cancella tag**. The daemon saves the old memory to a backup, the firmware
+   writes 316 zero bytes (user blocks 0-78; block 79 is never touched) and reads every block back.
+4. Only after the firmware verifies the erase, the tag is **unlinked from the spool**. If the unlink fails
+   after a verified erase, the dialog says so and the link can be removed by hand in the Tags section.
+5. Remove the tag. Closing the dialog does not read the tag again (it is blank), so it does not trigger the
+   blank-tag prompt until you place it on the reader again.
+
+An interrupted erase can leave the tag partly cleared: repeat it, or restore the backup with the Phoenix-OpenTag
+command-line client. Backend: `POST /api/v1/writer/prepare-erase`, then the usual `commit` with `replace`.
