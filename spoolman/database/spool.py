@@ -72,8 +72,13 @@ async def create(
     comment: str | None = None,
     archived: bool = False,
     extra: dict[str, str | None] | None = None,
+    commit: bool = True,
 ) -> models.Spool:
-    """Add a new spool to the database. Leave weight empty to assume full spool."""
+    """Add a new spool to the database. Leave weight empty to assume full spool.
+
+    With ``commit=False`` the row is only flushed: the caller commits, and sends the websocket
+    event itself, once the rest of its work is done (see spoolman.database.tag).
+    """
     filament_item = await filament.get_by_id(db, filament_id)
 
     # Set spool_weight to spool_weight if spool_weight is not null and spool_weight not provided
@@ -122,6 +127,9 @@ async def create(
         tags=[],
     )
     db.add(spool)
+    if not commit:
+        await db.flush()
+        return spool
     await db.commit()
     await spool_changed(spool, EventType.ADDED)
     return spool

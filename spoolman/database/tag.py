@@ -266,10 +266,36 @@ def _check_finite(*values: float | None) -> None:
         raise ItemCreateError("Decoded tag contains a non-finite number.")
 
 
-# Filament diameters in mm. Real filaments are 1.75 and 2.85; a value outside this range is a bad
-# tag, and a huge or tiny one breaks the length math when the spool is read back.
+# Sane physical ranges for a decoded tag. A value outside them is a bad tag, and a huge or tiny one
+# breaks the length math when the spool is read back: an infinite length made GET /spool fail for
+# everyone.
 _MIN_DIAMETER_MM = 0.5
 _MAX_DIAMETER_MM = 5.0
+_MIN_DENSITY_G_CM3 = 0.1
+_MAX_DENSITY_G_CM3 = 20.0
+_MAX_WEIGHT_G = 100_000.0  # nominal and measured net weight of a roll
+_MAX_SPOOL_WEIGHT_G = 10_000.0  # the empty spool itself
+
+
+def _check_range(name: str, value: float | None, low: float, high: float) -> None:
+    """Refuse a value outside its physical range, naming the field in the error."""
+    if value is not None and not low <= value <= high:
+        raise ItemCreateError(f"Decoded {name} {value} is outside the supported range.")
+
+
+def _same_measure(a: float | None, b: float | None) -> bool:
+    """Compare two measurements with a tolerance.
+
+    MySQL and MariaDB store these as single precision floats, so a 2.85 mm diameter read back from
+    the database is not exactly 2.85, and an exact comparison would never match there.
+    """
+    if a is None or b is None:
+        return a is None and b is None
+    return math.isclose(a, b, rel_tol=1e-5, abs_tol=1e-6)
+
+
+def _same_color(a: str | None, b: str | None) -> bool:
+    return (a or "").lower() == (b or "").lower()
 
 
 async def _find_filament_for_product(
@@ -280,9 +306,10 @@ async def _find_filament_for_product(
 ) -> models.Filament | None:
     """Find the filament this product already has, so a new roll reuses it.
 
-    A filament is one product: vendor, name, material, diameter and nominal weight together. The
-    tag's instance UUID identifies the roll and is deliberately not used here. Without a name or a
-    material there is no product to match, so nothing is reused.
+    A filament is one product: vendor, name, material, diameter, nominal weight and colour together.
+    The tag's instance UUID identifies the roll and is deliberately not used here. Without a name or
+    a material there is no product to match, so nothing is reused. Diameter and weight are compared
+    with a tolerance, and colour case-insensitively, after the database has narrowed the candidates.
     """
     if decoded.name is None or decoded.material is None:
         return None
@@ -290,82 +317,55 @@ async def _find_filament_for_product(
         models.Filament.name == decoded.name,
         models.Filament.material == decoded.material,
         models.Filament.vendor_id == (vendor_item.id if vendor_item is not None else None),
-        models.Filament.diameter == diameter,
-        models.Filament.weight == decoded.weight,
     )
-    return (await db.execute(stmt)).scalars().first()
+    for candidate in (await db.execute(stmt)).scalars().all():
+        if (
+            _same_measure(candidate.diameter, diameter)
+            and _same_measure(candidate.weight, decoded.weight)
+            and _same_color(candidate.color_hex, decoded.color_hex)
+        ):
+            return candidate
+    return None
 
 
-async def _discard_created(
+async def _add_tag_for_spool(
     db: AsyncSession,
-    spool_id: int | None,
-    filament_id: int | None,
-    vendor_id: int | None,
-) -> None:
-    """Remove the rows one create call made, newest first, so a refused or failed scan leaves nothing.
-
-    Each create commits on its own, so a rollback alone cannot undo them. Rows this call did not
-    create (a reused filament, an existing vendor) are never touched.
-    """
-    await db.rollback()
-    for label, row_id, delete in (
-        ("spool", spool_id, spool.delete),
-        ("filament", filament_id, filament.delete),
-        ("vendor", vendor_id, vendor.delete),
-    ):
-        if row_id is None:
-            continue
-        # A failed delete must not replace the error that caused the rollback: log it and carry on.
-        try:
-            await delete(db, row_id)
-        except Exception:
-            logger.exception("Could not remove %s %s after a failed tag create; check it manually", label, row_id)
-
-
-async def create_spool_from_decoded_tag(
-    *,
-    db: AsyncSession,
+    spool_item: models.Spool,
     uid: str,
     tag_format: str | None,
-    decoded: tag_decode.DecodedTag,
-) -> models.Spool:
-    """Create a spool from a decoded tag and link the tag to it, reusing the filament if it exists.
+) -> None:
+    """Link a UID to a new spool without committing: the create commits it together with the rest.
 
-    Only ever called for a UID that `find_spool_by_uid` just reported as unknown, from an
-    opt-in path (see spoolman/api/v1/tag.py) -- this function does not check that itself, so
-    a caller that skips the check can create a duplicate spool for an already-linked tag.
-
-    The nominal weight belongs to the filament, the measured weight of this roll to the spool's
-    initial weight, and the weight the tag says is already used is shown but never applied.
-
-    Args:
-        db: Database session.
-        uid: The tag UID in any shape; normalized here (also normalized again by `link`).
-        tag_format: The tag format that was decoded, e.g. "openprinttag".
-        decoded: The decoded tag contents.
-
-    Returns:
-        models.Spool: The newly created spool, linked to the tag.
-
-    Raises:
-        ItemCreateError: If the decoded values are not storable. Nothing is written in that case.
-        TagConflictError: If another request linked this UID first. The rows this call created
-            are removed again, and callers should fall back to `find_spool_by_uid`.
-
+    A UID that is already linked is a conflict. Two requests racing for the same UID are caught by
+    the unique index at flush time; the caller turns that into the same conflict.
     """
-    uid = normalize_uid(uid)
+    existing = await _get_tag_by_uid(db, uid)
+    if existing is not None:
+        raise _conflict(uid, existing)
+    tag = models.Tag(
+        uid=uid,
+        target_type=_target_type(spool_item),
+        format=tag_format,
+        added=datetime.utcnow().replace(microsecond=0),
+    )
+    spool_item.tags.append(tag)
+    await db.flush()
 
-    # Fall back to a default only when the tag does not carry the field. An explicit zero is not
-    # a missing value: validation refuses it.
-    density = decoded.density if decoded.density is not None else tag_decode.density_or_fallback(decoded.material)
-    diameter = decoded.diameter if decoded.diameter is not None else 1.75
+
+def _validate_decoded(decoded: tag_decode.DecodedTag, density: float, diameter: float) -> None:
+    """Refuse everything the database must never see, before the first write.
+
+    That is non-finite numbers, values outside their physical range, and values the response models
+    would reject: a value the codec accepts but the API cannot serve would break GET /filament and
+    GET /spool for everyone until someone removed it by hand.
+    """
     _check_finite(density, diameter, decoded.weight, decoded.initial_weight, decoded.spool_weight)
-    if not _MIN_DIAMETER_MM <= diameter <= _MAX_DIAMETER_MM:
-        raise ItemCreateError(f"Decoded diameter {diameter} mm is outside the supported range.")
+    _check_range("diameter", diameter, _MIN_DIAMETER_MM, _MAX_DIAMETER_MM)
+    _check_range("density", density, _MIN_DENSITY_G_CM3, _MAX_DENSITY_G_CM3)
+    _check_range("weight", decoded.weight, 0.0, _MAX_WEIGHT_G)
+    _check_range("measured weight", decoded.initial_weight, 0.0, _MAX_WEIGHT_G)
+    _check_range("spool weight", decoded.spool_weight, 0.0, _MAX_SPOOL_WEIGHT_G)
 
-    # Everything is validated before the first write. Vendor, filament and spool are committed
-    # one by one, so a value the response models reject would leave rows behind that break
-    # GET /filament and GET /spool until someone deletes them by hand.
     try:
         # Local imports: the API modules import this one, so importing them at module level
         # would be circular.
@@ -391,45 +391,125 @@ async def create_spool_from_decoded_tag(
     except ValidationError as e:
         raise ItemCreateError(f"Decoded tag values are not storable: {e}") from e
 
-    vendor_id = filament_id = spool_id = None
-    try:
-        vendor_item = None
-        if decoded.vendor_name:
-            vendor_item = await _find_vendor_by_exact_name(db, decoded.vendor_name)
-            if vendor_item is None:
-                vendor_item = await vendor.create(db=db, name=decoded.vendor_name)
-                vendor_id = vendor_item.id
 
-        filament_item = await _find_filament_for_product(db, decoded, vendor_item, diameter)
-        if filament_item is None:
-            filament_item = await filament.create(
-                db=db,
-                density=density,
-                diameter=diameter,
-                material=decoded.material,
-                name=decoded.name,
-                vendor_id=vendor_item.id if vendor_item is not None else None,
-                weight=decoded.weight,
-                spool_weight=decoded.spool_weight,
-                article_number=decoded.article_number,
-                color_hex=decoded.color_hex,
-                settings_extruder_temp=decoded.extruder_temp,
-                settings_bed_temp=decoded.bed_temp,
-            )
-            filament_id = filament_item.id
+async def _write_spool_and_tag(
+    db: AsyncSession,
+    decoded: tag_decode.DecodedTag,
+    uid: str,
+    tag_format: str | None,
+    density: float,
+    diameter: float,
+) -> tuple[models.Spool, models.Vendor | None, models.Filament | None]:
+    """Write vendor, filament, spool and tag link in the current transaction, and commit them together.
 
-        spool_item = await spool.create(
+    Returns the spool and the vendor and filament this call created, if it created them, so the caller
+    can announce them once the commit has gone through.
+    """
+    vendor_item = None
+    new_vendor = None
+    if decoded.vendor_name:
+        vendor_item = await _find_vendor_by_exact_name(db, decoded.vendor_name)
+        if vendor_item is None:
+            vendor_item = await vendor.create(db=db, name=decoded.vendor_name, commit=False)
+            new_vendor = vendor_item
+
+    filament_item = await _find_filament_for_product(db, decoded, vendor_item, diameter)
+    new_filament = None
+    if filament_item is None:
+        filament_item = await filament.create(
             db=db,
-            filament_id=filament_item.id,
-            initial_weight=decoded.initial_weight,
+            density=density,
+            diameter=diameter,
+            material=decoded.material,
+            name=decoded.name,
+            vendor_id=vendor_item.id if vendor_item is not None else None,
+            weight=decoded.weight,
             spool_weight=decoded.spool_weight,
+            article_number=decoded.article_number,
+            color_hex=decoded.color_hex,
+            settings_extruder_temp=decoded.extruder_temp,
+            settings_bed_temp=decoded.bed_temp,
+            commit=False,
         )
-        spool_id = spool_item.id
+        new_filament = filament_item
 
-        await link_spool(db=db, spool_id=spool_item.id, uid=uid, tag_format=tag_format)
+    spool_item = await spool.create(
+        db=db,
+        filament_id=filament_item.id,
+        initial_weight=decoded.initial_weight,
+        spool_weight=decoded.spool_weight,
+        commit=False,
+    )
+    await _add_tag_for_spool(db, spool_item, uid, tag_format)
+    await db.commit()
+    return spool_item, new_vendor, new_filament
+
+
+async def create_spool_from_decoded_tag(
+    *,
+    db: AsyncSession,
+    uid: str,
+    tag_format: str | None,
+    decoded: tag_decode.DecodedTag,
+) -> models.Spool:
+    """Create a spool from a decoded tag and link the tag to it, reusing the filament if it exists.
+
+    Only ever called for a UID that `find_spool_by_uid` just reported as unknown, from an
+    opt-in path (see spoolman/api/v1/tag.py) -- this function does not check that itself, so
+    a caller that skips the check can create a duplicate spool for an already-linked tag.
+
+    The vendor, filament, spool and tag link are written in one transaction: they are flushed as
+    they are created and committed once at the end, so either all of them exist or none do. The
+    websocket events are sent after that commit.
+
+    The nominal weight belongs to the filament, the measured weight of this roll to the spool's
+    initial weight, and the weight the tag says is already used is shown but never applied.
+
+    Args:
+        db: Database session.
+        uid: The tag UID in any shape; normalized here.
+        tag_format: The tag format that was decoded, e.g. "openprinttag".
+        decoded: The decoded tag contents.
+
+    Returns:
+        models.Spool: The newly created spool, linked to the tag.
+
+    Raises:
+        ItemCreateError: If the decoded values are not storable. Nothing is written in that case.
+        TagConflictError: If another request linked this UID first. Nothing this call wrote is
+            kept, and callers should fall back to `find_spool_by_uid`.
+
+    """
+    uid = normalize_uid(uid)
+
+    # Fall back to a default only when the tag does not carry the field. An explicit zero is not
+    # a missing value: validation refuses it.
+    density = decoded.density if decoded.density is not None else tag_decode.density_or_fallback(decoded.material)
+    diameter = decoded.diameter if decoded.diameter is not None else 1.75
+    _validate_decoded(decoded, density, diameter)
+
+    try:
+        spool_item, new_vendor, new_filament = await _write_spool_and_tag(
+            db, decoded, uid, tag_format, density, diameter
+        )
+    except IntegrityError:
+        # Another request linked this UID between our check and our flush. Nothing of ours was
+        # committed, so the rollback is the whole cleanup.
+        await db.rollback()
+        winner = await _get_tag_by_uid(db, uid)
+        if winner is None:
+            raise
+        raise _conflict(uid, winner) from None
     except BaseException:
-        await _discard_created(db, spool_id, filament_id, vendor_id)
+        await db.rollback()
         raise
+
+    # Only once the whole create is committed do websocket clients hear about it.
+    if new_vendor is not None:
+        await vendor.vendor_changed(new_vendor, EventType.ADDED)
+    if new_filament is not None:
+        await filament.filament_changed(new_filament, EventType.ADDED)
+    await spool.spool_changed(spool_item, EventType.ADDED)
     return spool_item
 
 

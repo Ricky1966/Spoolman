@@ -10,6 +10,7 @@ through the actual HTTP endpoint (POST /tag/scan with `create: true`) lives in
 tests_integration/tests/tag/ instead, where a real server is already up.
 """
 
+import struct
 from collections.abc import AsyncGenerator
 
 import pytest
@@ -318,13 +319,64 @@ async def test_same_name_but_other_diameter_or_weight_is_a_new_filament(db: Asyn
 
 @pytest.mark.asyncio
 async def test_a_failure_partway_leaves_no_rows_behind(db: AsyncSession, monkeypatch: pytest.MonkeyPatch):
-    async def fail_link(**_kwargs: object) -> None:
-        raise RuntimeError("link failed after the spool was written")
+    async def fail_link(*_args: object, **_kwargs: object) -> None:
+        raise RuntimeError("link failed after the vendor, filament and spool were flushed")
 
-    monkeypatch.setattr("spoolman.database.tag.link_spool", fail_link)
+    monkeypatch.setattr("spoolman.database.tag._add_tag_for_spool", fail_link)
     decoded = DecodedTag(material="PLA", name="PLA", vendor_name="Vendor", weight=1000.0)
 
     with pytest.raises(RuntimeError):
         await create_spool_from_decoded_tag(db=db, uid=_uid(), tag_format="openprinttag", decoded=decoded)
 
     assert await _row_counts(db) == (0, 0, 0)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        pytest.param("density", 5e-324, id="density-denormal"),
+        pytest.param("density", 1e308, id="density-huge"),
+        pytest.param("weight", 1e308, id="weight-huge"),
+        pytest.param("initial_weight", 1e308, id="measured-weight-huge"),
+        pytest.param("spool_weight", 1e308, id="spool-weight-huge"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_physically_impossible_magnitudes_are_refused(db: AsyncSession, field: str, value: float):
+    """A huge or tiny value makes the length math overflow, so it must never be stored."""
+    values = {"material": "PLA", "name": "PLA", "vendor_name": "Vendor", "weight": 1000.0, field: value}
+    with pytest.raises(ItemCreateError):
+        await create_spool_from_decoded_tag(db=db, uid=_uid(), tag_format="openprinttag", decoded=DecodedTag(**values))
+    assert await _row_counts(db) == (0, 0, 0)
+
+
+@pytest.mark.asyncio
+async def test_a_roll_of_another_colour_does_not_reuse_the_filament(db: AsyncSession):
+    """Same name and material, different colour: a different product, so a different filament."""
+    red = DecodedTag(material="PLA", name="PLA", vendor_name="Vendor", weight=1000.0, color_hex="ff0000")
+    black = DecodedTag(material="PLA", name="PLA", vendor_name="Vendor", weight=1000.0, color_hex="000000")
+    first = await create_spool_from_decoded_tag(db=db, uid=_uid("1"), tag_format="openprinttag", decoded=red)
+    second = await create_spool_from_decoded_tag(db=db, uid=_uid("2"), tag_format="openprinttag", decoded=black)
+    assert second.filament_id != first.filament_id
+
+
+@pytest.mark.asyncio
+async def test_a_single_precision_diameter_still_reuses_the_filament(db: AsyncSession):
+    """MySQL and MariaDB store the diameter as single precision: 2.85 reads back as 2.8499999046...."""
+    single_precision_285 = struct.unpack("f", struct.pack("f", 2.85))[0]
+    assert single_precision_285 != 2.85
+    first = await create_spool_from_decoded_tag(
+        db=db,
+        uid=_uid("1"),
+        tag_format="openprinttag",
+        decoded=DecodedTag(material="PLA", name="PLA", vendor_name="Vendor", weight=1000.0, diameter=2.85),
+    )
+    second = await create_spool_from_decoded_tag(
+        db=db,
+        uid=_uid("2"),
+        tag_format="openprinttag",
+        decoded=DecodedTag(
+            material="PLA", name="PLA", vendor_name="Vendor", weight=1000.0, diameter=single_precision_285
+        ),
+    )
+    assert second.filament_id == first.filament_id
