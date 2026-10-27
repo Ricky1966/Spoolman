@@ -20,6 +20,8 @@ from dataclasses import dataclass
 
 import cbor2
 
+from spoolman.tags.cbor_guard import cbor_item_length
+
 logger = logging.getLogger(__name__)
 
 OPENPRINTTAG_MIME = "application/vnd.openprinttag"
@@ -205,18 +207,25 @@ def _decode_cbor_map(raw: bytes) -> tuple[dict, int]:
     Raises:
         ValueError: If the bytes are not a complete CBOR map. Tag memory that was truncated
             or corrupted can be an incomplete item (cbor2 raises its own error types, none of
-            them ValueError) or complete CBOR that just isn't a map, and callers rely on
-            this function's only failure being ValueError.
+            them ValueError), complete CBOR that just isn't a map, or CBOR that uses semantic
+            tags, which are refused before cbor2 sees them. Callers rely on this function's
+            only failure being ValueError.
 
     """
-    buf = io.BytesIO(raw)
+    # Walk the item ourselves first. cbor2 must never see semantic tags: a few hundred bytes of
+    # shared references (tags 28/29) make it build a gigabyte-sized error message inside decode(),
+    # before any of our validation runs. See spoolman/tags/cbor_guard.py.
     try:
-        data = cbor2.CBORDecoder(buf, max_depth=_MAX_CBOR_DEPTH).decode()
+        length = cbor_item_length(raw, max_depth=_MAX_CBOR_DEPTH)
+    except ValueError as exc:
+        raise ValueError(f"Invalid CBOR: {exc}") from exc
+    try:
+        data = cbor2.CBORDecoder(io.BytesIO(raw[:length]), max_depth=_MAX_CBOR_DEPTH).decode()
     except cbor2.CBORDecodeError as exc:
         raise ValueError(f"Invalid CBOR: {exc}") from exc
     if not isinstance(data, dict):
         raise ValueError(f"Expected a CBOR map, got {type(data).__name__}")  # noqa: TRY004 -- ValueError is the contract
-    return data, buf.tell()
+    return data, length
 
 
 def _find_ndef_payload(raw_bytes: bytes) -> bytes | None:

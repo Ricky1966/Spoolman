@@ -13,6 +13,7 @@ import uuid
 import cbor2
 import pytest
 
+from spoolman.tags.decode import decode
 from spoolman.tags.openprinttag import (
     AUX_CONSUMED_WEIGHT,
     META_AUX_REGION_OFFSET,
@@ -36,6 +37,7 @@ from spoolman.tags.openprinttag import (
     _parse_ndef_records,
     decode_nfcv_memory,
 )
+from tests.test_cbor_guard import shared_reference_bomb
 
 _FIXTURES_DIR = pathlib.Path(__file__).parent / "fixtures" / "openprinttag"
 
@@ -391,3 +393,77 @@ def test_uid_reported_with_e0_last_is_read_in_specification_order() -> None:
     data = decode_nfcv_memory(raw, nfc_tag_uid=reader_order)
 
     assert data.effective_instance_uuid == str(uuid.uuid5(UUID_NS_INSTANCE, spec_order))
+
+
+# --- Semantic tags are refused before cbor2 sees them ---------------------------
+
+_REAL_CBOR_DECODER = cbor2.CBORDecoder
+
+
+def _cbor2_spy(fp: object, *args: object, **kwargs: object) -> cbor2.CBORDecoder:
+    """Stand in for CBORDecoder: behave normally, but fail if cbor2 is handed a semantic tag.
+
+    The bomb below is made of tags 28 and 29 (head bytes d8 1c and d8 1d). Legitimate sections
+    still go through the real decoder, so a happy-path decode is unaffected.
+    """
+    data = fp.getvalue()  # type: ignore[attr-defined]
+    assert b"\xd8\x1c" not in data
+    assert b"\xd8\x1d" not in data
+    return _REAL_CBOR_DECODER(fp, *args, **kwargs)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("levels", [4, 14, 20])
+def test_shared_reference_bomb_never_reaches_cbor2(monkeypatch: pytest.MonkeyPatch, levels: int) -> None:
+    """Refuse tags 28/29 before cbor2: it would format their exponential expansion into an error message.
+
+    A malformed tag 260 makes cbor2 build that message inside decode(), before any of our validation.
+    Refusing the tags first is the only thing that stops it, so cbor2 must not be handed the bytes.
+    """
+    monkeypatch.setattr(cbor2, "CBORDecoder", _cbor2_spy)
+    with pytest.raises(ValueError, match="semantic tags"):
+        _decode_cbor_map(shared_reference_bomb(levels))
+
+
+def _payload_with_bomb_in(section: str) -> bytes:
+    bomb = shared_reference_bomb(14)
+    if section == "meta":
+        return bomb + cbor2.dumps({})
+    if section == "main":
+        return cbor2.dumps({}) + bomb
+    # aux: meta (3 bytes: a1 02 04) + an empty main (1 byte) put the aux region at offset 4.
+    meta = cbor2.dumps({META_AUX_REGION_OFFSET: 4})
+    main = cbor2.dumps({})
+    assert len(meta) + len(main) == 4
+    return meta + main + bomb
+
+
+@pytest.mark.parametrize("section", ["meta", "main"])
+def test_shared_reference_bomb_in_meta_or_main_makes_the_tag_undecodable(
+    monkeypatch: pytest.MonkeyPatch, section: str
+) -> None:
+    raw = _nfcv_memory(_ndef_record("application/vnd.openprinttag", _payload_with_bomb_in(section)))
+    monkeypatch.setattr(cbor2, "CBORDecoder", _cbor2_spy)
+
+    with pytest.raises(ValueError, match="Invalid CBOR"):
+        decode_nfcv_memory(raw)
+
+
+def test_shared_reference_bomb_in_the_optional_aux_section_is_dropped(monkeypatch: pytest.MonkeyPatch) -> None:
+    raw = _nfcv_memory(_ndef_record("application/vnd.openprinttag", _payload_with_bomb_in("aux")))
+    monkeypatch.setattr(cbor2, "CBORDecoder", _cbor2_spy)
+
+    assert decode_nfcv_memory(raw).consumed_weight is None
+
+
+def test_decode_returns_none_for_a_shared_reference_bomb(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The scan path: decode() answers None and never hands cbor2 the tagged bytes."""
+    raw = _nfcv_memory(_ndef_record("application/vnd.openprinttag", _payload_with_bomb_in("main")))
+    monkeypatch.setattr(cbor2, "CBORDecoder", _cbor2_spy)
+
+    assert decode("openprinttag", raw) is None
+
+
+def test_real_prusa_dumps_use_no_semantic_tags() -> None:
+    """The guard must cost the happy path nothing: both real dumps decode with it in place."""
+    for name in ("prusa_sample_tag.bin", "prusa_test01_data.bin"):
+        assert decode_nfcv_memory((_FIXTURES_DIR / name).read_bytes()).material_class == "FFF"
